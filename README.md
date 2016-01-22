@@ -1,0 +1,1 @@
+### nanobox-hooks-mongodb ![Build Status Image](https://travis-ci.org/nanobox-io/nanobox-hooks-mongodb.svg)
