@@ -23,8 +23,13 @@ directory '/data/var/run' do
   group 'gonano'
 end
 
+directory '/data/etc/mongodb' do
+  owner 'gonano'
+  group 'gonano'
+end
+
 # set mongodb config
-template '/data/etc/mongod.conf' do
+template '/data/etc/mongodb/mongod.conf' do
   source 'mongodb.conf.erb'
   mode 0600
   owner 'gonano'
@@ -49,7 +54,7 @@ end
 
 template '/etc/service/db/run' do
   mode 0755
-  variables ({ exec: "/data/bin/mongod --smallfiles --config /data/etc/mongod.conf 2>&1" })
+  variables ({ exec: "/data/bin/mongod --smallfiles --config /data/etc/mongodb/mongod.conf 2>&1" })
 end
 
 # Configure narc
@@ -69,7 +74,6 @@ exec /opt/gonano/bin/narcd /opt/gonano/etc/narc.conf
   EOF
 end
 
-
 if payload[:platform] != 'local'
 
   # Setup root keys for data migrations
@@ -88,6 +92,23 @@ if payload[:platform] != 'local'
 
   file '/root/.ssh/authorized_keys' do
     content payload[:ssh][:admin_key][:public_key]
+  end
+
+  # Create some ssh host keys
+  execute "ssh-keygen -f /opt/gonano/etc/ssh/ssh_host_rsa_key -N '' -t rsa" do
+    not_if { ::File.exists? '/opt/gonano/etc/ssh/ssh_host_rsa_key' }
+  end
+
+  execute "ssh-keygen -f /opt/gonano/etc/ssh/ssh_host_dsa_key -N '' -t dsa" do
+    not_if { ::File.exists? '/opt/gonano/etc/ssh/ssh_host_dsa_key' }
+  end
+
+  execute "ssh-keygen -f /opt/gonano/etc/ssh/ssh_host_ecdsa_key -N '' -t ecdsa" do
+    not_if { ::File.exists? '/opt/gonano/etc/ssh/ssh_host_ecdsa_key' }
+  end
+
+  execute "ssh-keygen -f /opt/gonano/etc/ssh/ssh_host_ed25519_key -N '' -t ed25519" do
+    not_if { ::File.exists? '/opt/gonano/etc/ssh/ssh_host_ed25519_key' }
   end
 
 end

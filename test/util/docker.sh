@@ -25,7 +25,7 @@ start_container() {
     --name=$name \
     -d \
     -e "PATH=$(path)" \
-    --cap-add=NET_ADMIN \
+    --privileged \
     --net=nanobox \
     --ip=$ip \
     --volume=${hookit_dir}/:/opt/gonano/hookit/mod \

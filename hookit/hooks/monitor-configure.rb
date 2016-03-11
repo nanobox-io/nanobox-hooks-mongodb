@@ -18,9 +18,10 @@ template "/data/etc/mongodb/mongodb.conf" do
   group 'gonano'
 end
 
-# chown data/var/db/mongodb for gonano
-execute "chown /data/var/db/mongodb" do
-  command 'chown -R gonano:gonano /data/var/db/mongodb'
+# set mongodb config
+directory '/data/var/db/mongodb' do
+  owner 'gonano'
+  group 'gonano'
 end
 
 directory '/var/log/mongodb' do
@@ -28,17 +29,32 @@ directory '/var/log/mongodb' do
   group 'gonano'
 end
 
-file '/var/log/mongodb/mongodb.log' do
+directory '/data/var/run' do
   owner 'gonano'
   group 'gonano'
 end
 
-# Narc Setup
-template '/opt/local/etc/narc/narc.conf' do
-  variables ({
-    service: payload[:service],
-    app: payload[:app]
-  })
+# create log file
+file '/data/var/log/mongodb/mongodb.log' do
+  owner 'gonano'
+  group 'gonano'
+end
+
+# Configure narc
+template '/opt/gonano/etc/narc.conf' do
+  variables ({ uid: payload[:uid], app: payload[:app], logtap: payload[:logtap_host] })
+end
+
+directory '/etc/service/narc'
+
+file '/etc/service/narc/run' do
+  mode 0755
+  content <<-EOF
+#!/bin/sh -e
+export PATH="/opt/local/sbin:/opt/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/gonano/sbin:/opt/gonano/bin"
+
+exec /opt/gonano/bin/narcd /opt/gonano/etc/narc.conf
+  EOF
 end
 
 if payload[:platform] != 'local'
