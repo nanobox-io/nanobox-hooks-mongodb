@@ -1,0 +1,173 @@
+#!/usr/bin/env ruby
+
+# hookit is installed as a bundled app, so we need bundler to load it for us
+$:.unshift  '/opt/gonano/hookit/vendor/bundle'
+require 'bundler/setup'
+
+# load hookit/setup to bootstrap hookit and import the dsl
+require 'hookit/setup'
+
+require 'timeout'
+
+execute 'multicast route' do
+  command 'route add -net 224.0.0.0/3 dev eth0 || true'
+end
+
+file '/etc/nanoinit.d/mroute' do
+  content 'route add -net 224.0.0.0/3 dev eth0'
+  mode 0755
+end
+
+directory '/data/etc/flip'
+
+directory '/etc/service/flip' do
+  recursive true
+end
+
+directory '/etc/service/flip/log' do
+  recursive true
+end
+
+# Import service (and start)
+directory '/etc/service/db' do
+  recursive true
+end
+
+directory '/etc/service/db/log' do
+  recursive true
+end
+
+template '/etc/service/db/log/run' do
+  mode 0755
+  source 'log-run.erb'
+  variables ({ svc: "db" })
+end
+
+template '/etc/service/db/run' do
+  mode 0755
+  variables ({ exec: "/data/bin/mongod --smallfiles --config /data/etc/mongodb/mongod.conf 2>&1" })
+end
+
+template '/etc/service/flip/log/run' do
+  mode 0755
+  source 'log-run.erb'
+  variables ({ svc: "flip" })
+end
+
+template '/etc/service/flip/run' do
+  mode 0755
+  source 'run-root.erb'
+  variables ({ exec: "/data/flip/flipd /data/etc/flip/flip.conf 2>&1" })
+end
+
+begin
+  Timeout::timeout(90) do
+    begin
+      config = execute "check replica set config" do
+        command <<-EOF
+         /data/bin/mongo --host #{payload[:members].select {|member| member[:role] == "primary"}[0][:local_ip]}:27017 --eval 'rs.config();'
+        EOF
+      end
+      if config =~ /null/
+        raise "config is null"
+      end
+    rescue Exception => e
+      begin
+        execute "initialize replica set config" do
+          ignore_exit true
+          command <<-EOF
+            /data/bin/mongo --host #{payload[:members].select {|member| member[:role] == "primary"}[0][:local_ip]}:27017 --eval 'rs.initiate();'
+          EOF
+        end
+        execute "reconfig replica set" do
+          ignore_exit true
+          command <<-EOF
+            /data/bin/mongo --host #{payload[:members].select {|member| member[:role] == "primary"}[0][:local_ip]}:27017 --eval 'rs.reconfig({ _id : "gonano", members : [ {_id : 0, host : "#{payload[:members].select {|member| member[:role] == "primary"}[0][:local_ip]}:27017", priority: 1}, {_id : 1, host : "#{payload[:members].select {|member| member[:role] == "secondary"}[0][:local_ip]}:27017", priority: 0.5}, {_id : 2, host : "#{payload[:members].select {|member| member[:role] == "arbitrator"}[0][:local_ip]}", arbiterOnly: true} ] }, {force : true});'
+          EOF
+          user 'gonano'
+        end
+      rescue
+      end
+      sleep 5
+      retry
+    end
+  end
+rescue Timeout::Error
+  exit 1
+end
+
+begin
+  Timeout::timeout(90) do
+    begin
+      execute "reconfig replica set" do
+        command <<-EOF
+          /data/bin/mongo --host #{payload[:members].select {|member| member[:role] == "primary"}[0][:local_ip]}:27017 --eval 'rs.reconfig({ _id : "gonano", members : [ {_id : 0, host : "#{payload[:members].select {|member| member[:role] == "primary"}[0][:local_ip]}:27017", priority: 1}, {_id : 1, host : "#{payload[:members].select {|member| member[:role] == "secondary"}[0][:local_ip]}:27017", priority: 0.5}, {_id : 2, host : "#{payload[:members].select {|member| member[:role] == "arbitrator"}[0][:local_ip]}", arbiterOnly: true} ] }, {force : true});'
+        EOF
+        user 'gonano'
+      end
+    rescue Exception => e
+      sleep 5
+      retry
+    end
+  end
+rescue Timeout::Error
+  exit 1
+end
+
+# begin
+#   # 2.x returns null if not initiated
+#   # 3.x exits poorly if not initiated
+#   # config = execute "check replica set config" do
+#   #   command <<-EOF
+#   #    /data/bin/mongo --host #{payload[:members].select {|member| member[:role] == "primary"}[0][:local_ip]}:27017 --eval 'rs.config();'
+#   #   EOF
+#   # end
+
+#   # if config =~ /null/
+#   #   raise "config is null"
+#   # end
+# # rescue
+#   execute "initialize replica set config" do
+#     output = command <<-EOF
+#       /data/bin/mongo --host #{payload[:members].select {|member| member[:role] == "primary"}[0][:local_ip]}:27017 --eval 'rs.initiate();'
+#     EOF
+#   end
+# rescue
+#   retry
+# end
+
+# config = execute "check replica set config" do
+#   command <<-EOF
+#     /data/bin/mongo --host #{payload[:members].select {|member| member[:role] == "primary"}[0][:local_ip]}:27017 --eval 'rs.config();'
+#   EOF
+# end
+
+# # if config =~ /null/
+# #   raise "config still null"
+# # end
+# begin
+#   Timeout::timeout(90) do
+
+#   end
+# rescue Timeout::Error
+#   exit 1
+# rescue
+#   sleep 5
+#   retry
+# end
+
+begin
+  Timeout::timeout(90) do
+    loop do
+      status = execute "check replica set status" do
+        command <<-EOF
+          /data/bin/mongo --host #{payload[:members].select {|member| member[:role] == "primary"}[0][:local_ip]}:27017 --eval 'printjson(rs.status());'
+        EOF
+      end
+      sleep 10
+      break if status =~ /PRIMARY/ and status =~ /SECONDARY/ and status =~ /ARBITER/
+    end
+  end
+rescue Timeout::Error
+  exit 1
+end

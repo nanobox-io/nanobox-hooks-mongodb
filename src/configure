@@ -1,0 +1,106 @@
+#!/usr/bin/env ruby
+
+# hookit is installed as a bundled app, so we need bundler to load it for us
+$:.unshift  '/opt/gonano/hookit/vendor/bundle'
+require 'bundler/setup'
+
+# load hookit/setup to bootstrap hookit and import the dsl
+require 'hookit/setup'
+
+include Hooky::Mongodb
+
+# Setup
+config = converge( CONFIG_DEFAULTS, payload[:config] )
+
+if payload[:platform] != 'local'
+
+  # Setup root keys for data migrations
+  directory '/root/.ssh' do
+    recursive true
+  end
+
+  file '/root/.ssh/id_rsa' do
+    content payload[:ssh][:admin_key][:private_key]
+    mode 0600
+  end
+
+  file '/root/.ssh/id_rsa.pub' do
+    content payload[:ssh][:admin_key][:public_key]
+  end
+
+  file '/root/.ssh/authorized_keys' do
+    content payload[:ssh][:admin_key][:public_key]
+  end
+
+  # Create some ssh host keys
+  execute "ssh-keygen -f /opt/gonano/etc/ssh/ssh_host_rsa_key -N '' -t rsa" do
+    not_if { ::File.exists? '/opt/gonano/etc/ssh/ssh_host_rsa_key' }
+  end
+
+  execute "ssh-keygen -f /opt/gonano/etc/ssh/ssh_host_dsa_key -N '' -t dsa" do
+    not_if { ::File.exists? '/opt/gonano/etc/ssh/ssh_host_dsa_key' }
+  end
+
+  execute "ssh-keygen -f /opt/gonano/etc/ssh/ssh_host_ecdsa_key -N '' -t ecdsa" do
+    not_if { ::File.exists? '/opt/gonano/etc/ssh/ssh_host_ecdsa_key' }
+  end
+
+  execute "ssh-keygen -f /opt/gonano/etc/ssh/ssh_host_ed25519_key -N '' -t ed25519" do
+    not_if { ::File.exists? '/opt/gonano/etc/ssh/ssh_host_ed25519_key' }
+  end
+
+end
+
+# Configure narc
+template '/opt/gonano/etc/narc.conf' do
+  variables ({ uid: payload[:component][:uid], logvac: payload[:logvac_host] })
+end
+
+directory '/etc/service/narc'
+
+file '/etc/service/narc/run' do
+  mode 0755
+  content <<-EOF
+#!/bin/sh -e
+export PATH="/opt/local/sbin:/opt/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/gonano/sbin:/opt/gonano/bin"
+
+exec /opt/gonano/bin/narcd /opt/gonano/etc/narc.conf
+  EOF
+end
+
+if ['default', 'primary', 'secondary'].include? payload[:member][:role]
+
+  directory '/data/var/db/mongodb' do
+    recursive true
+  end
+
+  # chown data/var/db/mongodb for gonano
+  execute 'chown /data/var/db/mongodb' do
+    command 'chown -R gonano:gonano /data/var/db/mongodb'
+  end
+
+  # create log file
+  file '/data/var/log/mongodb/mongodb.log' do
+    owner 'gonano'
+    group 'gonano'
+  end
+
+  directory '/data/var/run' do
+    owner 'gonano'
+    group 'gonano'
+  end
+
+  directory '/data/etc/mongodb' do
+    owner 'gonano'
+    group 'gonano'
+  end
+
+  # set mongodb config
+  template '/data/etc/mongodb/mongod.conf' do
+    source 'mongodb.conf.erb'
+    mode 0600
+    owner 'gonano'
+    group 'gonano'
+    variables ({ config: config, user: "nanobox" })
+  end
+end

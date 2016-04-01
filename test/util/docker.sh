@@ -1,6 +1,6 @@
 
 util_dir="$(dirname $(readlink -f $BASH_SOURCE))"
-hookit_dir="$(readlink -f ${util_dir}/../../hookit)"
+hookit_dir="$(readlink -f ${util_dir}/../../src)"
 payloads_dir=$(readlink -f ${util_dir}/../payloads)
 
 payload() {
@@ -14,7 +14,7 @@ run_hook() {
 
   docker exec \
     $container \
-    hookit $hook "$payload"
+    /opt/nanobox/hooks/$hook "$payload"
 }
 
 start_container() {
@@ -24,11 +24,12 @@ start_container() {
   docker run \
     --name=$name \
     -d \
+    -m 1024M \
     -e "PATH=$(path)" \
     --privileged \
     --net=nanobox \
     --ip=$ip \
-    --volume=${hookit_dir}/:/opt/gonano/hookit/mod \
+    --volume=${hookit_dir}/:/opt/nanobox/hooks \
     nanobox/mongodb:$VERSION
 }
 

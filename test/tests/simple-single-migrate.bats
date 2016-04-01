@@ -1,5 +1,6 @@
 # source docker helpers
 . util/docker.sh
+. util/service.sh
 
 echo_lines() {
   for (( i=0; i < ${#lines[*]}; i++ ))
@@ -13,134 +14,143 @@ echo_lines() {
 }
 
 @test "Configure Old Container" {
-  run run_hook "simple-single-old" "default-configure" "$(payload default/configure-production)"
-
+  run run_hook "simple-single-old" "configure" "$(payload configure)"
   [ "$status" -eq 0 ] 
 }
 
-@test "Start Old MongoDB" {
-  run run_hook "simple-single-old" "default-start" "$(payload default/start)"
+@test "Start Old ${service_name}" {
+  run run_hook "simple-single-old" "start" "$(payload start)"
   [ "$status" -eq 0 ]
   # Verify
-  run docker exec simple-single-old bash -c "ps aux | grep [m]ongod"
+  wait_for_running "simple-single-old"
+  wait_for_listening "simple-single-old" "192.168.0.2" ${default_port}
   [ "$status" -eq 0 ]
-  until docker exec "simple-single-old" bash -c "nc 192.168.0.2 27017 < /dev/null"
-  do
-    sleep 1
-  done
 }
 
-@test "Insert Old MongoDB Data" {
-  run docker exec "simple-single-old" bash -c "/data/bin/mongo gonano --eval 'db.test.insert({\"key\": 1, \"value\": 1});'"
-  echo_lines
-  [ "$status" -eq 0 ]
-  run docker exec "simple-single-old" bash -c "/data/bin/mongo gonano --eval 'db.test.find({}, { key: 1, value: 1, _id:0 }).shellPrint();'"
-  echo_lines
-  [ "${lines[2]}" = '{ "key" : 1, "value" : 1 }' ]
-  [ "$status" -eq 0 ]
+@test "Insert Old ${service_name} Data" {
+  insert_test_data "simple-single-old" "192.168.0.2" ${default_port} "mykey" "data"
+  verify_test_data "simple-single-old" "192.168.0.2" ${default_port} "mykey" "data"
 }
 
 @test "Start New Container" {
-  start_container "simple-single-new" "192.168.0.3"
+  start_container "simple-single-new" "192.168.0.4"
 }
 
 @test "Configure New Container" {
-  run run_hook "simple-single-new" "default-configure" "$(payload default/configure-production)"
+  run run_hook "simple-single-new" "configure" "$(payload configure)"
   [ "$status" -eq 0 ] 
 }
 
-@test "Start New MongoDB" {
-  run run_hook "simple-single-new" "default-start" "$(payload default/start)"
+@test "Start New ${service_name}" {
+  run run_hook "simple-single-new" "start" "$(payload start)"
   [ "$status" -eq 0 ]
   # Verify
-  run docker exec simple-single-new bash -c "ps aux | grep [m]ongod"
+  wait_for_running "simple-single-new"
+  wait_for_listening "simple-single-new" "192.168.0.4" ${default_port}
   [ "$status" -eq 0 ] 
 }
 
-@test "Stop New MongoDB" {
-  run run_hook "simple-single-new" "default-stop" "$(payload default/stop)"
+@test "Stop New ${service_name}" {
+  run run_hook "simple-single-new" "stop" "$(payload stop)"
   [ "$status" -eq 0 ]
-  while docker exec "simple-single-new" bash -c "ps aux | grep [m]ongod"
-  do
-    sleep 1
-  done
+  wait_for_stop simple-single-new
   # Verify
-  run docker exec simple-single-new bash -c "ps aux | grep [m]ongod"
-  [ "$status" -eq 1 ] 
+  verify_stopped simple-single-new
 }
 
-@test "Start New SSHD" {
-  # start ssh server
-  run run_hook "simple-single-new" "default-start_sshd" "$(payload default/start_sshd)"
-  echo_lines
-  [ "$status" -eq 0 ]
-  until docker exec "simple-single-new" bash -c "ps aux | grep [s]shd"
-  do
-    sleep 1
-  done
-}
-
-@test "Pre-Export Old MongoDB" {
-  run run_hook "simple-single-old" "default-single-pre_export" "$(payload default/single/pre_export)"
+@test "Run Import Prep" {
+  if [ ! -f ../src/import-prep ]; then
+    skip "import-prep hook isn't defined"
+  fi 
+  run run_hook "simple-single-new" "import-prep" "$(payload import-prep)"
   echo_lines
   [ "$status" -eq 0 ]
 }
 
-@test "Update Old MongoDB Data" {
-  run docker exec "simple-single-old" bash -c "/data/bin/mongo gonano --eval 'db.test.update({\"key\": 1}, {\$set:{\"value\":2}});'"
+@test "Run Export Prep" {
+  if [ ! -f ../src/Export-prep ]; then
+    skip "Export-prep hook isn't defined"
+  fi 
+  run run_hook "simple-single-old" "export-prep" "$(payload export-prep)"
   echo_lines
-  [ "$status" -eq 0 ]
-  run docker exec "simple-single-old" bash -c "/data/bin/mongo gonano --eval 'db.test.find({}, { key: 1, value: 1, _id:0 }).shellPrint();'"
-  echo_lines
-  [ "${lines[2]}" = '{ "key" : 1, "value" : 2 }' ]
   [ "$status" -eq 0 ]
 }
 
-@test "Stop Old MongoDB" {
-  run run_hook "simple-single-old" "default-stop" "$(payload default/stop)"
+@test "Import Live ${service_name}" {
+  if [ ! -f ../src/import-live ]; then
+    skip "import-live hook isn't defined"
+  fi 
+  run run_hook "simple-single-new" "import-live" "$(payload import-live)"
+  echo_lines
   [ "$status" -eq 0 ]
-  while docker exec "simple-single-old" bash -c "ps aux | grep [m]ongod"
-  do
-    sleep 1
-  done
+}
+
+@test "Export Live ${service_name}" {
+  if [ ! -f ../src/export-live ]; then
+    skip "export-live hook isn't defined"
+  fi 
+  run run_hook "simple-single-old" "export-live" "$(payload export-live)"
+  echo_lines
+  [ "$status" -eq 0 ]
+}
+
+@test "Update Old ${service_name} Data" {
+  update_test_data "simple-single-old" "192.168.0.2" ${default_port} "mykey" "date"
+  verify_test_data "simple-single-old" "192.168.0.2" ${default_port} "mykey" "date"
+}
+
+@test "Stop Old ${service_name}" {
+  run run_hook "simple-single-old" "stop" "$(payload stop)"
+  [ "$status" -eq 0 ]
+  wait_for_stop "simple-single-old"
   # Verify
-  run docker exec simple-single-old bash -c "ps aux | grep [m]ongod"
-  [ "$status" -eq 1 ] 
+  verify_stopped "simple-single-old"
 }
 
-@test "Export Old MongoDB" {
-  run run_hook "simple-single-old" "default-single-export" "$(payload default/single/export)"
+@test "Export Final ${service_name}" {
+  if [ ! -f ../src/export-final ]; then
+    skip "export-final hook isn't defined"
+  fi 
+  run run_hook "simple-single-old" "export-final" "$(payload export-final)"
   echo_lines
   [ "$status" -eq 0 ]
 }
 
-@test "Stop New SSHD" {
-  # stop ssh server
-  run run_hook "simple-single-new" "default-stop_sshd" "$(payload default/stop_sshd)"
+@test "Import Final ${service_name}" {
+  if [ ! -f ../src/import-final ]; then
+    skip "import-final hook isn't defined"
+  fi 
+  run run_hook "simple-single-new" "import-final" "$(payload import-final)"
+  echo_lines
   [ "$status" -eq 0 ]
-  while docker exec "simple-single-new" bash -c "ps aux | grep [s]shd"
-  do
-    sleep 1
-  done
 }
 
-@test "Restart New MongoDB" {
-  run run_hook "simple-single-new" "default-start" "$(payload default/start)"
+@test "Export Clean" {
+  if [ ! -f ../src/export-clean ]; then
+    skip "export-clean hook isn't defined"
+  fi 
+  run run_hook "simple-single-new" "export-clean" "$(payload export-clean)"
+  [ "$status" -eq 0 ]
+}
+
+@test "Import Clean" {
+  if [ ! -f ../src/import-clean ]; then
+    skip "import-clean hook isn't defined"
+  fi 
+  run run_hook "simple-single-new" "import-clean" "$(payload import-clean)"
+  [ "$status" -eq 0 ]
+}
+
+@test "Restart New ${service_name}" {
+  run run_hook "simple-single-new" "start" "$(payload start)"
   [ "$status" -eq 0 ]
   # Verify
-  run docker exec simple-single-new bash -c "ps aux | grep [m]ongod"
-  [ "$status" -eq 0 ]
-  until docker exec "simple-single-new" bash -c "nc 192.168.0.3 27017 < /dev/null"
-  do
-    sleep 1
-  done
+  wait_for_running "simple-single-new"
+  wait_for_listening "simple-single-new" "192.168.0.4" ${default_port}
 }
 
-@test "Verify New MongoDB Data" {
-  run docker exec "simple-single-new" bash -c "/data/bin/mongo gonano --eval 'db.test.find({}, { key: 1, value: 1, _id:0 }).shellPrint();'"
-  echo_lines
-  [ "${lines[2]}" = '{ "key" : 1, "value" : 2 }' ]
-  [ "$status" -eq 0 ]
+@test "Verify New ${service_name} Data" {
+verify_test_data "simple-single-new" "192.168.0.4" ${default_port} "mykey" "date"
 }
 
 @test "Stop Old Container" {

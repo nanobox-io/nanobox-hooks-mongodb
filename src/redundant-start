@@ -1,0 +1,62 @@
+#!/usr/bin/env ruby
+
+# hookit is installed as a bundled app, so we need bundler to load it for us
+$:.unshift  '/opt/gonano/hookit/vendor/bundle'
+require 'bundler/setup'
+
+# load hookit/setup to bootstrap hookit and import the dsl
+require 'hookit/setup'
+
+execute 'multicast route' do
+  command 'route add -net 224.0.0.0/3 dev eth0 || true'
+end
+
+file '/etc/nanoinit.d/mroute' do
+  content 'route add -net 224.0.0.0/3 dev eth0'
+  mode 0755
+end
+
+directory '/etc/service/flip' do
+  recursive true
+end
+
+directory '/etc/service/flip/log' do
+  recursive true
+end
+
+# Import service (and start)
+directory '/etc/service/db' do
+  recursive true
+end
+
+directory '/etc/service/db/log' do
+  recursive true
+end
+
+template '/etc/service/db/log/run' do
+  mode 0755
+  source 'log-run.erb'
+  variables ({ svc: "db" })
+end
+
+template '/etc/service/db/run' do
+  mode 0755
+  variables ({ exec: "/data/bin/mongod --smallfiles --config /data/etc/mongodb/mongod.conf 2>&1" })
+end
+
+template '/etc/service/flip/log/run' do
+  mode 0755
+  source 'log-run.erb'
+  variables ({ svc: "flip" })
+end
+
+template '/etc/service/flip/run' do
+  mode 0755
+  source 'run-root.erb'
+  variables ({ exec: "/data/flip/flipd /data/etc/flip/flip.conf 2>&1" })
+end
+
+ensure_socket 'db' do
+  port '27017'
+  action :listening
+end

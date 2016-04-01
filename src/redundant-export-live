@@ -1,0 +1,31 @@
+#!/usr/bin/env ruby
+
+# hookit is installed as a bundled app, so we need bundler to load it for us
+$:.unshift  '/opt/gonano/hookit/vendor/bundle'
+require 'bundler/setup'
+
+# load hookit/setup to bootstrap hookit and import the dsl
+require 'hookit/setup'
+
+payload[:members].each do |member|
+
+  if ['default', 'primary', 'secondary'].include? member[:role]
+
+    # find available space
+    new_member_stat = `ssh -o StrictHostKeyChecking=no #{member[:local_ip]} stat -f --format=\\\"%a %S\\\" /data/var/db/mongodb`
+    available_space = new_member_stat.split(' ')[0].to_i * new_member_stat.split(' ')[1].to_i
+
+    # find needed space
+    needed_space = `du -bs /data/var/db/mongodb`.split(' ')[0].to_i
+
+    if available_space < needed_space
+      puts "Receiving side too small!!"
+      exit 1
+    end #unless payload[:clear_data] == "false"
+
+    execute "send bulk data to new member" do
+      command "tar -cf - /data/var/db/mongodb | ssh -o StrictHostKeyChecking=no #{member[:local_ip]} tar -xpf -"
+    end
+
+  end
+end
