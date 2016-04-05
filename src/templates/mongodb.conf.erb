@@ -1,0 +1,13 @@
+# This is an example config file for MongoDB.
+dbpath = /data/var/db/mongodb
+port = 27017
+pidfilepath = /data/var/run/mongodb.pid
+logpath = /data/var/log/mongodb/mongodb.log
+logappend = <%= config[:mongodb_logappend] %>
+nojournal = <%= config[:mongodb_nojournal] %>
+nohttpinterface = true
+directoryperdb = <%= config[:monogdb_directoryperdb] %>
+<%= "#{config[:mongodb_log_verbosity]} = true" if config[:mongodb_log_verbosity] != '' %>
+objcheck = <%= config[:mongodb_objcheck] %>
+noscripting = <%= config[:mongodb_noscripting] %>
+master = true

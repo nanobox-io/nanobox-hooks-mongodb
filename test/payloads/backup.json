@@ -1,0 +1,15 @@
+{
+  "strategy": "warehouse",
+  "ips": {
+    "default": "192.168.0.3"
+  },
+  "warehouse": {
+    "host": "192.168.0.9",
+    "port": 8080,
+    "token": "asdlkfjsalsdjfklsjdf",
+    "backup_id": "11258593abc"
+  },
+  "users": [
+
+  ]
+}

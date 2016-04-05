@@ -1,0 +1,40 @@
+#!/usr/bin/env ruby
+
+# hookit is installed as a bundled app, so we need bundler to load it for us
+$:.unshift  '/opt/gonano/hookit/vendor/bundle'
+require 'bundler/setup'
+
+# load hookit/setup to bootstrap hookit and import the dsl
+require 'hookit/setup'
+
+execute "dump and upload to backup container" do
+  command <<-EOF
+    bash -c '/data/bin/mongodump --oplog --out /mongodump
+    tar \
+      -cpz \
+      -C / \
+      mongodump/ \
+        | tee >(md5sum | cut -f1 -d" " > /tmp/md5sum) \
+          | ssh \
+            -o StrictHostKeyChecking=no \
+            #{payload[:warehouse][:host]} \
+            "cat > /data/var/db/mongodb/#{payload[:warehouse][:backup_id]}.tgz"
+    for i in ${PIPESTATUS[@]}; do
+      if [[ $i -ne 0 ]]; then
+        exit $i
+      fi
+    done
+    '
+  EOF
+end
+
+remote_sum = `ssh -o StrictHostKeyChecking=no #{payload[:warehouse][:host]} "md5sum /data/var/db/mongodb/#{payload[:warehouse][:backup_id]}.tgz"`.to_s.strip.split(' ').first
+
+# Read POST results
+local_sum = File.open('/tmp/md5sum') {|f| f.readline}.strip
+
+# Ensure checksum match
+if remote_sum != local_sum
+  puts 'checksum mismatch'
+  exit 1
+end

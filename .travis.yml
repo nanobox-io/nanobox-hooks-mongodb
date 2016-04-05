@@ -15,4 +15,4 @@ before_install:
   - echo building $VERSION
   - docker pull nanobox/mongodb:$VERSION
 
-script: sudo test/run_all.sh $VERSION
+script: sudo stdbuf -oL test/run_all.sh $VERSION
