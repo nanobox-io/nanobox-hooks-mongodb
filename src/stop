@@ -11,8 +11,10 @@ service 'db' do
   action :disable
   init :runit
   only_if {`sv status db` =~ /^run/}
+  not_if { !Dir.exist?('/etc/service/db') }
 end
 
 directory '/etc/service/db' do
   action :delete
+  not_if { !Dir.exist?('/etc/service/db') }
 end

@@ -23,7 +23,7 @@ wait_for_listening() {
   container=$1
   ip=$2
   port=$3
-  until docker exec ${container} bash -c "nc ${ip} ${port} < /dev/null"
+  until docker exec ${container} bash -c "nc -q 1 ${ip} ${port} < /dev/null"
   do
     sleep 1
   done
