@@ -79,6 +79,10 @@ if ['default', 'primary', 'secondary'].include? payload[:member][:role]
     command 'chown -R gonano:gonano /data/var/db/mongodb'
   end
 
+  directory '/data/var/log/mongodb' do
+    recursive true
+  end
+
   # create log file
   file '/data/var/log/mongodb/mongodb.log' do
     owner 'gonano'
