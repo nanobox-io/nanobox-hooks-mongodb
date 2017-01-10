@@ -24,7 +24,7 @@ payload[:members].each do |member|
     end #unless payload[:clear_data] == "false"
 
     execute "send bulk data to new member" do
-      command "tar -cf - /data/var/db/mongodb | ssh -o StrictHostKeyChecking=no #{member[:local_ip]} tar -xpf -"
+      command "tar -cf - /data/var/db/mongodb | ssh -o StrictHostKeyChecking=no #{member[:local_ip]} tar -C / -xpf -"
     end
 
   end
