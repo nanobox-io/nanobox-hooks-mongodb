@@ -10,7 +10,7 @@ require 'json'
 
 include Hooky::Mongodb
 
-config = converge( CONFIG_DEFAULTS, payload[:config] )
+config = converge( CONFIG_DEFAULTS, payload[:config] || {} )
 
 plan = {
   redundant: false,

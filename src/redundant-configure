@@ -9,7 +9,7 @@ require 'hookit/setup'
 
 include Hooky::Mongodb
 
-config = converge( CONFIG_DEFAULTS, payload[:config] )
+config = converge( CONFIG_DEFAULTS, payload[:config] || {} )
 
 directory '/data/etc/flip'
 
