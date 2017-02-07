@@ -10,7 +10,7 @@ require 'hookit/setup'
 include Hooky::Mongodb
 
 # Setup
-config = converge( CONFIG_DEFAULTS, payload[:config] )
+config = converge( CONFIG_DEFAULTS, payload[:config] || {} )
 
 if payload[:platform] != 'local'
 
