@@ -12,7 +12,7 @@ payload[:members].each do |member|
   if ['default', 'primary', 'secondary'].include? member[:role]
 
     execute "send diff data to new member" do
-      command "rsync --delete -a /data/var/db/mongodb/. #{member[:local_ip]}:/data/var/db/mongodb/"
+      command "rsync --delete -e 'ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no' -a /data/var/db/mongodb/. #{member[:local_ip]}:/data/var/db/mongodb/"
     end
 
   end
