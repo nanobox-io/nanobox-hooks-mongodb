@@ -16,4 +16,4 @@ if File.exist?('/data/etc/environment.d/nano-envs')
 end
 -%>
 
-exec su - gonano -c '<%= exec %>'
+exec chpst -u gonano <%= exec %>
