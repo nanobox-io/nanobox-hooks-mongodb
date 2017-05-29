@@ -57,7 +57,7 @@ if payload[:logvac_host]
     variables ({ uid: payload[:component][:uid], logvac: payload[:logvac_host] })
   end
   # ensure log files are created
-  ["/var/log/gonano/db/current", "/data/var/log/mongodb.log"].each do |log_file|
+  ["/var/log/gonano/db/current", "/data/var/log/mongodb/mongodb.log"].each do |log_file|
     if not ::File.exists? "#{log_file}"
       parent = File.expand_path("..", "#{log_file}")
       
