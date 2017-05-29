@@ -20,6 +20,10 @@ run_hook() {
 start_container() {
   name=$1
   ip=$2
+  
+  if docker info | grep "Storage Driver" | grep 'devicemapper\|zfs\|btrfs'; then 
+    docker_opts+="--storage-opt size=5G"
+  fi
 
   docker run \
     --name=$name \
@@ -29,6 +33,7 @@ start_container() {
     --privileged \
     --net=nanobox \
     --ip=$ip \
+    ${docker_opts[@]} \
     --volume=${hookit_dir}/:/opt/nanobox/hooks \
     nanobox/mongodb:$VERSION
 }
