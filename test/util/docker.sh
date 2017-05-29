@@ -29,6 +29,7 @@ start_container() {
     --privileged \
     --net=nanobox \
     --ip=$ip \
+    --storage-opt size=5G \
     --volume=${hookit_dir}/:/opt/nanobox/hooks \
     nanobox/mongodb:$VERSION
 }
