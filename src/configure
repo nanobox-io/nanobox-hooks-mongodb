@@ -51,6 +51,23 @@ if payload[:platform] != 'local'
 
 end
 
+# make sure the env dir exists
+directory "/data/etc/env.d" do
+  recursive true
+end
+
+# and that it's owned by gonano
+execute "chown gonano /data/etc/env.d"
+
+(payload[:env] || {}).each do |key, value|
+  file "/data/etc/env.d/#{key}" do
+    content value
+    owner 'gonano'
+    group 'gonano'
+    mode 0444
+  end
+end
+
 if payload[:logvac_host]
   # Configure narc
   template '/opt/gonano/etc/narc.conf' do
