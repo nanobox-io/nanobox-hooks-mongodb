@@ -6,6 +6,7 @@
   "extra_packages": null,
   "users": null,
   "logvac_host": null,
+  "env": null,
   "platform": "local",
   "member": {
     "local_ip": "192.168.0.2",
