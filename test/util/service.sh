@@ -88,9 +88,9 @@ verify_test_data() {
     sleep 10
   done
   docker exec ${container} bash -c "/data/bin/mongo gonano --eval 'db.test.remove({\"writable\": \"true\"});'"
-  run docker exec ${container} bash -c "/data/bin/mongo gonano --eval 'db.test.find({\"key\": \"${key}\"}, { key: 1, value: 1, _id:0 }).shellPrint();'"
+  run docker exec ${container} bash -c "/data/bin/mongo gonano --quiet --eval 'db.test.find({\"key\": \"${key}\"}, { key: 1, value: 1, _id:0 }).shellPrint();'"
   echo_lines
-  [ "${lines[2]}" = "{ \"key\" : \"${key}\", \"value\" : \"${data}\" }" ]
+  [ "${lines[0]}" = "{ \"key\" : \"${key}\", \"value\" : \"${data}\" }" ]
   [ "$status" -eq 0 ]
 }
 
