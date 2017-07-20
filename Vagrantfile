@@ -43,6 +43,8 @@ Vagrant.configure(2) do |config|
     echo "Pulling the build image"
     docker pull nanobox/mongodb:2.6
     docker pull nanobox/mongodb:3.0
+    docker pull nanobox/mongodb:3.2
+    docker pull nanobox/mongodb:3.4
   SCRIPT
 
   # create an adhoc network
